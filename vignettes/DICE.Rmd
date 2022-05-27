@@ -147,7 +147,8 @@ dat <- data.frame(MEMP_pr=ranzoni.branch.pr.m$MEMP_pr,Celltype=ranzoniCT.v)
 dat[mpp.idx[primedCells.li$GP],'Celltype'] <- 'primedGP'
 dat[mpp.idx[primedCells.li$MEMP],'Celltype'] <- 'primedMEMP'
 dat[dat$Celltype=='MPP','Celltype'] <- 'unprimed'
-ggplot()+geom_boxplot(data=dat[ranzoniCT.v=='MPP',],aes(x=Celltype,y=MEMP_pr,fill=Celltype))+
+ggplot(data=dat[ranzoniCT.v=='MPP',],aes(x=Celltype,y=MEMP_pr,fill=Celltype))+
+  geom_boxplot()+
   labs(title='Differentiating Prob towards MEMPs',
        x='MPPs',y='MEMP Prob')+
   geom_hline(yintercept = 0.5,col='darkred',linetype='dashed')+
@@ -171,28 +172,24 @@ ggplot()+geom_boxplot(data=dat[ranzoniCT.v=='MPP',],aes(x=Celltype,y=MEMP_pr,fil
 library(Matrix)
 data(ranzoniATAC)
 
-# primedMEMPs for scATAC-Seq data
+# define primed MEMPs for scATAC-Seq data
 use_MEMP_marker.v <- intersect(rownames(ranzoni.gene.access.m), primedCellMarker.l$primedMEMP)
-print(length(use_MEMP_marker.v))
 MEMP.access.m <- ranzoni.gene.access.m[use_MEMP_marker.v,]
 MEMP.sum.atac.v <- colSums(MEMP.access.m)
 atac.MEMP.prime.cell.v <- names(MEMP.sum.atac.v)[MEMP.sum.atac.v>quantile(MEMP.sum.atac.v,0.9)]
-print(length(atac.MEMP.prime.cell.v))
 
-# primedGPs for scATAC-Seq data
+# define primed GPs for scATAC-Seq data
 use_GP_marker.v <- intersect(rownames(ranzoni.gene.access.m), primedCellMarker.l$primedGP)
-print(length(use_GP_marker.v))
 GP.access.m <- ranzoni.gene.access.m[use_GP_marker.v,]
 GP.sum.atac.v <- colSums(GP.access.m)
 atac.GP.prime.cell.v <- names(GP.sum.atac.v)[GP.sum.atac.v>quantile(GP.sum.atac.v,0.9)]
-print(length(atac.GP.prime.cell.v))
 
-# exclude the overlapped primed cells
+# exclude overlapping primed cells
 overlap.v <- intersect(atac.MEMP.prime.cell.v,atac.GP.prime.cell.v)
 atac.MEMP.prime.cell.v <- setdiff(atac.MEMP.prime.cell.v,overlap.v)
 atac.GP.prime.cell.v <- setdiff(atac.GP.prime.cell.v,overlap.v)
-print(paste0('# of primedMEMPs=',length(atac.MEMP.prime.cell.v)))
-print(paste0('# of primedGPs=',length(atac.GP.prime.cell.v)))
+print(paste0('Number of primed MEMPs=',length(atac.MEMP.prime.cell.v)))
+print(paste0('Number of primed GPs=',length(atac.GP.prime.cell.v)))
 
 ```
 
