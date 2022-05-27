@@ -1,0 +1,88 @@
+#' @title 
+#' Identifies all candidate priming regulatory factors
+#' 
+#' @aliases FindCandidateFactors.R
+#'  
+#' @description 
+#' This function performs differential overexpression analysis in order to 
+#' identify candidate regulatory factors that may play a role in priming of 
+#' various lineages
+#' 
+#' @param data.m
+#' The input data matrix, representing the normalized gene expression data matrix
+#' over regulatory factors (rows) and single cells (columns).
+#' 
+#' @param rf.v
+#' A vector of regulatory factor identifiers. Must be the same identifier as used for
+#' the rownames of \code{data.m}.
+#'
+#' @param celltypes.v
+#' A vector of cell-type identifiers. Matches columns of \code{data.m}.
+#'
+#' @param mpp
+#' Character specifying the cell-type that defines the "multi-potent"
+#' cell population, i.e. the population where priming is to be assessed.
+#'
+#' @param linCT.v
+#' Character vector specifying the competing downstream lineages, for which
+#' priming is to be assessed.
+#' 
+#' @param sigth
+#' Significance threshold for P-values. The default value NULL makes a Bonferroni correction
+#' at 0.05 level. If another significance threshold is desired, provide numerical input.
+#' 
+#' @return candRF.lv
+#' A list of vectors with regulatory factor identifiers for candidate priming RF.
+#' Each list entry corresponds to one competing lineage.
+#' 
+#' @return evals
+#' The eigenvalues of the distance covariance matrix
+#' 
+#' 
+#' 
+#' @references 
+#' Qi Luo, Alok K Maity, Andrew E Teschendorff
+#' \emph{Distance Covariance Entropy reveals primed states and bifurcation dynamics in single-cell RNA-Seq data}
+#' Submitted.
+#' 
+#' 
+#' @examples 
+#'
+#' 
+#' 
+#' 
+#' @export
+#'
+FindCandidateFactors <- function(data.m,rf.v,celltypes.v,mpp,linCT.v,sigth=NULL){
+
+  rfdata.m <- data.m[match(intersect(rf.v,rownames(data.m)),rownames(data.m)),];
+  mpp.idx <- which(celltypes.v==mpp);
+  candRF.lv <- list();
+  if(is.null(sigth)){ ### use Bonferroni
+     sigth <- 0.05/nrow(rfdata.m);
+  }
+  for(i in 1:length(linCT.v)){
+    lin.idx <- which(celltypes.v==linCT.v[i]);
+    pval1.v <- apply(rfdata.m,1,doWTfP,mpp.idx,lin.idx);
+    oth <- setdiff(1:length(linCT.v),i);
+    othLIN.idx <- which(celltypes.v %in% linCT.v[oth]);
+    pval2.v <- apply(rfdata.m,1,doWTfP,othLIN.idx,lin.idx);
+    sig.idx <- intersect(which(pval1.v < sigth),which(pval2.v < sigth));
+    print(paste("Found ",length(sig.idx)," candidate RFs for lineage ",linCT.v[i],sep=""));
+    if(length(sig.idx)==0){
+        print("Try relaxing significance threshold!");
+    }
+    candRF.lv[[i]] <- rownames(rfdata.m)[sig.idx];
+   }
+  names(candRF.lv) <- linCT.v;      
+  return(candRF.lv);
+}
+
+#### Auxilliary functions
+#' 
+#' 
+doWTfP <- function(v,mpp.idx,lin.idx){
+    pval <- wilcox.test(v[mpp.idx],v[lin.idx],alt="less")$p.value
+    return(pval);
+}
+

@@ -1,0 +1,16 @@
+Package: DICE
+Title: Distance Covariance Entropy
+Version: 0.9.1
+Description: The DICE package contains suite of functions to assess if there is priming in a multipotent cell population, to identify putative regulatory factors driving such priming as well as the primed cells. The Distance Covariance Entropy (DICE) is a metric to facilitate the identification of such primed states. 
+Date: 2022-05-26
+Author: Andrew E Teschendorff
+Maintainer: Andrew Teschendorff <andrew@picb.ac.cn>
+Depends: R (>= 4.2.0)
+Imports: parallel, corpcor, Biobase, Hmisc, destiny, gridExtra, ggplot2, Matrix, ggpubr
+Suggests: roxygen2, BiocStyle, knitr, rmarkdown
+VignetteBuilder: knitr
+License: GPL-3
+LazyData: true
+NeedsCompilation: no
+Encoding: UTF-8
+RoxygenNote: 7.1.1

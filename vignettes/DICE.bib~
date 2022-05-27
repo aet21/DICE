@@ -1,0 +1,88 @@
+@Article{Luo2022,
+author= {Q. Luo, A. K. Maity and A. E. Teschendorff},
+title={Distance Covariance Entropy reveals primed states and bifurcation dynamics in single-cell RNA-Seq data},
+journal= {Submitted},
+year = {2022},
+}
+
+
+
+@Article{Ranzoni2021,
+  author = {A. M. Ranzoni, A. Tangherloni, I. Berest, S. Giovanni Riva, B. Myers, P. M. Strzelecka, J. Xu, E. Panada, I. Mohorianu, J.B. Zaugg and A. Cvejic},
+  title =  {Integrative Single-Cell RNA-Seq and ATAC-Seq Analysis of Human Developmental Hematopoiesis},
+  journal = 	 {Cell Stem Cell},
+  year = 	 {2021},
+  volume = 	 {28},
+  number = 	 {3},
+  pages = 	 {472-487}
+}
+
+@article{vanWieringen2010,
+   author = {van Wieringen, Wessel N. and van der Vaart, Aad W.},
+   title = {Statistical analysis of the cancer cell's molecular entropy using high-throughput data},
+   journal = {Bioinformatics},
+   volume = {27},
+   number = {4},
+   pages = {556-563},
+   ISSN = {1367-4803},
+   DOI = {10.1093/bioinformatics/btq704},
+   url = {https://doi.org/10.1093/bioinformatics/btq704},
+   year = {2010},
+   type = {Journal Article}
+}
+
+@article{Ghanbari2019,
+   author = {Ghanbari, M. and Lasserre, J. and Vingron, M.},
+   title = {The Distance Precision Matrix: computing networks from non-linear relationships},
+   journal = {Bioinformatics},
+   volume = {35},
+   number = {6},
+   pages = {1009-1017},
+   ISSN = {1367-4811 (Electronic) 1367-4803 (Linking)},
+   DOI = {10.1093/bioinformatics/bty724},
+   url = {https://www.ncbi.nlm.nih.gov/pubmed/30165509},
+   year = {2019},
+   type = {Journal Article}
+}
+
+@article{Szekely2017,
+   author = {Székely, Gábor J. and Rizzo, Maria L.},
+   title = {The Energy of Data},
+   journal = {Annual Review of Statistics and Its Application},
+   volume = {4},
+   number = {1},
+   pages = {447-479},
+   DOI = {10.1146/annurev-statistics-060116-054026},
+   url = {https://www.annualreviews.org/doi/abs/10.1146/annurev-statistics-060116-054026},
+   year = {2017},
+   type = {Journal Article}
+}
+
+@article{Yang2017,
+   author = {Yang, L. and Wang, W. H. and Qiu, W. L. and Guo, Z. and Bi, E. and Xu, C. R.},
+   title = {A single-cell transcriptomic analysis reveals precise pathways and regulatory mechanisms underlying hepatoblast differentiation},
+   journal = {Hepatology},
+   volume = {66},
+   number = {5},
+   pages = {1387-1401},
+   ISSN = {1527-3350 (Electronic)
+0270-9139 (Linking)},
+   DOI = {10.1002/hep.29353},
+   url = {https://www.ncbi.nlm.nih.gov/pubmed/28681484},
+   year = {2017},
+   type = {Journal Article}
+}
+
+@Article{Teschendorff2020,
+  author =  {Teschendorff, A.E. and Wang, N.},
+  title = 	 {Improved detection of tumor suppressor events in single-cell RNA-Seq data},
+  journal = 	 {NPJ Genom Med},
+  year = 	 {2020},
+  volume = 	 {5},
+  number = 	 {43},
+  OPTpages = 	 {},
+  OPTmonth = 	 {},
+  OPTnote = 	 {},
+  OPTannote = 	 {}
+}
+

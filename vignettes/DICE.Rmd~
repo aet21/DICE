@@ -1,0 +1,270 @@
+---
+title: "Introduction to DICE"
+author: Qi Luo and Andrew E Teschendorff
+date: "`r Sys.Date()`"
+package: DICE
+output: 
+  BiocStyle::html_document:
+    theme: readable
+bibliography: DICE.bib  
+vignette: >
+  %\VignetteIndexEntry{Distance Covariance Entropy tool for scRNA-Seq data analysis}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r vignette-options, echo=FALSE, message=FALSE, warning=FALSE}
+require(BiocStyle)
+```
+
+
+> __Abstract: DICE is an R-package which uses the concept of Distance Covariance Entropy to help quantify bifurcation dynamics from scRNA-Seq data. Specifically, the package provides a suite of functions to quantify the degree of priming of a multipotent cell population in the context of a scRNA-Seq dataset encompassing multipotent cells as well as more mature cell populations representing competing downstream lineages. The package uses Distance Covariance Entropy (DICE) not only to quantify the degree of priming, but also to identify candidate regulatory factors implicated in priming as well as the corresponding primed cells. This methodology, which only requires scRNA-Seq data, has however been validated in datasets with matched scATAC-Seq data, either in the same cells (SHARE-Seq) or in separate cell populations representing the same cell-types.__
+
+
+# Motivation and Background
+<p>Single-cell RNA-Seq (scRNA-Seq) data offers the opportunity to study the dynamics of cell-fate transitions at an unprecedented detail. Key challenges that can be addressed with single-cell data are the identification of regulatory factors controling such transitions, including those that are implicated in the earliest stages of the cell-fate commitment process. This stage of early commitment among multi-or-bipotent cells is commonly known as priming. In addition, the timing of bifurcations of multipotent states into downstream competing lineages is complicated due to the inherent sparseness of scRNA-Seq data around such bifurcation points. The DICE R-package provides a suite of functions to help address some of these challenges. The acronym DICE stands for DIstance Covariance Entropy, which is a novel metric we introduce in @Luo2022 , to quantify the overall degree of dependence between a set of regulatory factors (RFs) across a pool of cells. In practice this pool of cells refers to a multi-or-bi potent cell population representing a cellular state that bifurcates into a number of competing downstream lineages. DICE is in effect a covariance entropy (@vanWieringen2010) but computed over the distance covariance matrix (@Ghanbari2019 , @Szekely2017), as opposed to the ordinary covariance matrix. The distance covariance matrix allows not only non-linear associations between RFs to be identified, but also non-monotonic ones which could be missed with non-parametric correlations metrics such as Spearman.</p>
+<p>In this tutorial vignette, we describe three potential applications of **DICE**:</p>
+<ol type="1">
+<li>Quantification of priming in a multipotent cell population.</li>
+<li>Identification of RFs controling priming into a given lineage.</li>
+<li>Estimating the timing of bifurcations from timecourse scRNA-Seq data.</li>
+</ol>
+
+<p>To illustrate these applications, we will use two scRNA-Seq datasets:</p>
+<ol type="1">
+<li>A scRNA-Seq dataset from @Ranzoni2021 , representing the bifurcation of hematopoietic multipotent progenitor cells (MPPs) into granulocyte progenitors (GPs) and megakaryocyte-erythroid-mast progenitors (MEMPs) during fetal liver hematopoiesis. This dataset is chosen because there is matched scATAC-Seq data for the same cell-types, allowing validation of the DICE predictions. However, the current version of DICE only operates on scRNA-Seq data, with the scATAC-Seq only meant to validate results obtained on scRNA-Seq data. As such, one of the goals of DICE is to demonstrate how it is possible to identify primed cellular states from scRNA-Seq data only, without the need for scATAC-Seq.</li>
+<li> A timecourse scRNA-Seq dataset of liver differentiation where mouse hepatoblasts are differentiated into hepatocytes and cholangiocytes (@Yang2017) .</li>
+</ol>
+
+# Tutorial Example: priming during fetal liver hematopoiesis
+In order to run the tutorial we must first load in the necessary library and data objects:
+
+## Loading in the scRNA-Seq data
+```{r chunk1, eval=T, echo=T}
+library(DICE);
+data(ranzoni); 
+data(humanTF);
+ls();
+```
+We shall use the `ranzomi.m` data matrix object which contains a log-normalized scRNA-Seq data matrix defined for 1159 regulatory factors and 1659 cells. The cell-types are encoded in `ranzoniCT.v` and the distribution of cell-types is
+
+```{r chunk2, eval=T, echo=T}
+ncpct.v <- summary(factor(ranzoniCT.v));
+print(ncpct.v);
+```
+<p>We are interested in assessing whether there is priming in the MPP cell population in relation to differentiation into either the granulocyte or megakaryote-erythrocyte lineage. The data itself is defined for 177 cells representing granulocyte progenitors (GPs), 192 common progenitors representing megakaryocte-erythrocyte-mast progenitors (MEMPs) and 1200 MPPs.</p>
+<p>The other object loaded in is `humanTF.v`. This is a vector encoding human regulatory factors. Because the `ranzoni.m` data matrix has already been reduced to only contain regulatory factors, in this particular case we don't need `humanTF.v`, but more generally if our data matrix were to be defined for all genes, we would want to use `humanTF.v` to select out the expression profiles for these RFs.</p>
+
+## Identifying candidate regulatory factors for priming
+
+The first step in our analysis is to identify candidate RFs that may be implicated in priming by performing a differential overexpression analysis, comparing progenitors of one lineage to MPPs as well as to progenitors of the other lineage. We can accomplish this using the `FindCandidateFactors` function:
+```{r chunk3, eval=T, echo=T}
+crf.o <- FindCandidateFactors(ranzoni.m,rf.v=humanTF.v,celltypes.v=ranzoniCT.v,mpp="MPP",linCT.v=c("Granulocyte Prog","Comm-Prog"),sigth=NULL,type1fth="Mean");
+names(crf.o) <- c("GP","MEMP");
+```
+Of note, this function also does a filtering of candidate RFs by their frequency of expression in the MPP cell population. In particular, it only keeps RFs with a frequency of expression in the MPP population less than the mean value as computed over all candidate overexpressed RFs, as indicated by the `type1fth` argument. The rationale for this filtering is that the fraction of MPP cells primed to a given lineage is expected to be a low number. If no filtering by frequency is desired, the user can set `type1fth` to `NULL`.
+
+## Quantification of priming in multipotent cell population
+
+Having identified the candidate regulatory factors for each lineage, we now proceed to assess whether there is any evidence of priming into these lineages. This can be accomplished with the `CompDICE` and `CompPrimingPval` functions. We run the `CompDICE` function to estimate the distance covariance entropy of the candidate RFs for each lineage:
+
+```{r chunk4, eval=T, echo=T}
+mpp.idx <- which(ranzoniCT.v=="MPP");
+dice.v <- vector();
+for(lin in 1:2){
+ dice.v[lin] <- CompDICE(ranzoni.m[names(crf.o[[lin]]),mpp.idx], useSpear=FALSE, std=TRUE)$dice;
+}
+names(dice.v) <- names(crf.o);
+print(dice.v);
+```
+
+We now compare these estimated DICE values to those of randomized data matrices, using the `CompPrimingPval` function, which effectively computes a P-value of significance that the observed DICE values are lower than those of a null distribution given by randomization of the data matrices:
+```{r chunk5, eval=T, echo=T}
+prpval.lo <- list();
+for(lin in 1:2){
+ prpval.lo[[lin]] <- CompPrimingPval(ranzoni.m[names(crf.o[[lin]]),mpp.idx], dice=dice.v[lin], nMC=100, ncores=4);
+}
+names(prpval.lo) <- names(crf.o);
+print(prpval.lo[[1]]$pval);
+print(prpval.lo[[2]]$pval);
+```
+These are empirical P-values and since the number of Monte-Carlo runs was set to 100, this means that the P-values are less than 0.01. In practice, we obviously advise at least 1000 Montte-Carlo runs to ensure P-values are stable. Given that the observed DICE values are lower than those of the null distribution, this would suggest that priming towards the GP and MEMP lineages is indeed present in the MPP cell population. We can generate a figure to confirm the statistical significance of the P-values:
+```{r chunk6, fig.width=7,fig.height=3, fig.fullwidth=T, eval=T, echo=T}
+par(mfrow=c(1,2));
+par(mar=c(4,4,2,1));
+for(lin in 1:2){
+ plot(density(prpval.lo[[lin]]$null),col="green",lwd=2,xlim=c(dice.v[lin],0),xlab="DICE",ylab="Density",main="");
+ abline(v=dice.v[lin],col="slateblue",lwd=2);
+ text(x=dice.v[lin],y=2000,"Observed DICE value",col="slateblue",pos=4);
+}
+```
+
+## Characterization of the primed states
+
+The next step is to characterize the primed states, i.e the identification of regulatory factors driving the priming as well as the corresponding primed cells. We can accomplish these tasks using the `FindPrimingFactors` and `FindPrimedCells` functions.
+
+```{r chunk7, eval=T, echo=T}
+prfac.lo <- list();
+for(lin in 1:2){
+ prfac.lo[[lin]] <- FindPrimingFactors(ranzoni.m[names(crf.o[[lin]]),mpp.idx]);
+}
+names(prfac.lo) <- names(crf.o);
+```
+
+Let us now study the output from this function. Let us first consider the GP-lineage.
+
+```{r chunk8, eval=T, echo=T}
+print(prfac.lo$GP$rankedLOO);
+head(prfac.lo$GP$rankedPairs);
+```
+<p>The first output `rankedLOO` ranks the candidate RFs by a leave-one-out (LOO) analysis, whereby each RF was removed whilst recomputing DICE. Thus, the top RFs in this list are the ones for which their removal leads to largest increases in DICE, corresponding to the largest increases in randomness. Thus, these RFs are important drivers of priming (lowering of entropy). As we can see, UHRF1 and IRF8 are the top 2 RFs. The second output `rankedPairs` ranks pairs of RFs according to a Spearman rank correlation, which complements the DICE analysis. Using this dual perturbation/LOO - Spearman correlation analysis, we can thus observe that UHRF1-IRF8 is the top-ranking pair, and therefore this pair would be a candidate pair for priming factors into the GP lineage.</p>
+As far as the MEMP-lineage is concerned:
+```{r chunk9, eval=T, echo=T}
+print(prfac.lo$MEMP$rankedLOO);
+head(prfac.lo$MEMP$rankedPairs);
+```
+Again, there is a clear pair of regulatory factors (GATA1-KLF1) that stands out as priming factors for the MEMP lineage. Note that we are not stating that these are the only important factors, but rather that the output of the above function provides a list of the most likely priming factors.
+
+To find the cells primed for the GP and MEMP lineages, we can now run:
+```{r chunk10, eval=T, echo=T}
+prf.lv <- list(GP=c("UHRF1","IRF8"),MEMP=c("GATA1","KLF1"));
+primedCells.li <- FindPrimedCells(ranzoni.m[,mpp.idx],prf.lv);
+print(paste("Fraction of MPP GP-primed cells=",round(length(primedCells.li$GP)/length(mpp.idx),3),sep=""));
+print(paste("Fraction of MPP MEMP-primed cells=",round(length(primedCells.li$MEMP)/length(mpp.idx),3),sep=""));
+```
+Thus, we can see that the fraction of GP and MEMP primed cells is only around 7 and 2%, respectively. 
+
+
+## Validation of primed states
+
+We now aim to validate these primed states using matched scATAC-Seq data from the same Ranzoni et al study (@Ranzoni2021). To clarify, these scATAC-Seq profiles are not available for exactly the same cells, but they are available for the same cell-types.
+
+
+# Application of DICE to timing of bifurcations
+
+To illustrate how DICE can be used to help pinpoint the timing of bifurcation points, we consider a timecourse differentiation scRNA-Seq dataset of mouse hepatoblasts into cholangiocytes and hepatocytes (@Yang2017). There are a total of 447 cells distributed across 7 timepoints (E10, E11, E12, E13, E14, E15 and E17). 
+
+## Loading in the scRNA-Seq data and generating the diffusion map
+```{r chunkL1, eval=T, echo=T}
+data(yangLiver);
+yangLiver;
+phenoData(yangLiver);
+summary(factor(phenoData(yangLiver)$Time));
+```
+<p>Whilst it is possible to analyse the scRNA-Seq data from @Yang2017 by starting out from the full gene expression data matrix, what we have done to reduce package-size and to speed up the computational analysis is to load in a data matrix defined over 22 liver-specific transcription factors (TFs), whose role in liver differentiation has been previously validated (@Teschendorff2020). Moreover, instead of using TF-expression, we use estimated transcription factor differentiation activity (TFA) values. These TFA-values are a measure of differentiation activity, derived from corresponding TF-regulons, and have been shown to display better sensitivity than TF-expression values (@Teschendorff2020).</p>
+
+Next, we confirm that the majority of these 22 liver-specific TFs display increased differentiation activity with developmental timepoint:
+```{r chunkL2, eval=T, echo=T}
+yangTFA.m <- exprs(yangLiver);
+yangTP.v <- phenoData(yangLiver)$TimeIDX;
+stat.m <- matrix(apply(yangTFA.m,1,function(v) { summary(lm(v ~ yangTP.v))$coeff[2,3:4];}),ncol=2,byrow=TRUE);
+print(summary(factor(sign(stat.m[which(stat.m[,2] < 0.05/nrow(yangTFA.m)),1]))));
+```
+We can see that 16 of the 22 TFs display significantly increased differentiation activity with developmental timepoint, thus validating the majority of them. Nevertheless, we proceed with all 22 TFs to derive a diffusion map over these 22 factors and to infer lineage trajectories. For this we use the DiffusionMap function from the `destiny` R-package:
+
+```{r chunkL3, eval=T, echo=T}
+dmap.o <- DiffusionMap(data=yangLiver,k=30,verbose=TRUE);
+dc.m <- eigenvectors(dmap.o);
+head(cor(dc.m,yangTP.v));
+```
+We can see from the above, that diffusion component-1 (DC1) associates very strongly with developmental timepoint. To infer pseudotime, we also need to specify the root-state. This can be done in many different ways, and users are free to use their favourite method to propose a root-state. Given the strong association of DC1 with developmental timepoint, we pick as root-state the cell from E10 with the largest absolute DC1 value. 
+
+```{r chunkL4, eval=T, echo=T}
+e10.idx <- which(yangTP.v==1);
+root.idx <- e10.idx[which.max(abs(dc.m[e10.idx,1]))];
+dpt.o <- DPT(dmap.o,tips=root.idx);
+```
+We are now ready to plot the diffusion map:
+
+```{r chunkL5, fig.width=7.5,fig.height=3.5, fig.fullwidth=T, eval=T, echo=T}
+par(mar=c(4,4,2,1));
+p1 <- plot(dpt.o,dcs=1:2,col_by="dpt",paths_to=1:3,pch=23,col_path=c("darkgreen","green","yellow"),lwd=3);
+p2 <- plot(dpt.o,dcs=1:2,col_by="HNF4A");
+p3 <- plot(dpt.o,dcs=1:2,col_by="LSR");
+p4 <- plot(dpt.o,dcs=1:2,col_by="Time");
+grid.arrange(p1,p2,p3,p4,layout_matrix=matrix(1:4,nrow=1));                                                     
+```
+From left to right, the above figure displays the diffusion map with cells annotated by diffusion pseudotime (DPT), by the TFA of a hepatocyte-specific factor (HNF4A), by the TFA of a cholangiocyte-factor (LSR) and by developmental timepoint. From the diffusion map, we can observe the two branches of differentiation into hepatocytes and cholangiocytes. Whilst the lineage trajectory algorithm identifies a bifurcation point, the timing of this bifurcation in relation to the developmental timepoint is unclear. Hence, in what follows we use DICE to help pinpoint the timing of the bifurcation.
+
+## Identification of key transcription factors and DICE computation
+
+Before computing DICE, we first identify the hepatocyte and cholangiocyte-specific TFs that display increased differentiation activity along the timecourse, and which do so specificly to each branch. To find these antagonistic TFs, we perform a differential TFA analysis between the cells of each terminal hepatocyte and cholangiocyte branch.
+
+```{r chunkL6, eval=T, echo=T}
+sigUP.idx <- intersect(which(stat.m[,2]<0.05/nrow(stat.m)),which(stat.m[,1]>0));
+end.idx <- which(yangTP.v==7); ## terminal cells
+brch1.idx <- intersect(which(dc.m[,2] > 0.05),end.idx);
+brch2.idx <- intersect(which(dc.m[,2] < -0.05),end.idx);
+statEND.m <- yangTFA.m[,1:2];
+colnames(statEND.m) <- c("t","P");
+for(r in 1:nrow(statEND.m)){
+    tt.o <- t.test(yangTFA.m[r,brch1.idx],yangTFA.m[r,brch2.idx]);
+    statEND.m[r,] <- c(tt.o$stat,tt.o$p.value);
+}
+sort(statEND.m[sigUP.idx,1],decreasing=TRUE);
+```
+We can see from the sorted t-statistics of differential TFA, that there are 4 cholangiocyte-specific TFs (LSR, ELF3, IRF6 and BGN) and a larger number of hepatocyte factors. To compute DICE, we thus select the top-4 cholangiocyte (LSR, ELF3, IRF6 and BGN) and hepatocyte factors (NR1I3, NR1I2, FOXA2, TRIM15), respectively. Choosing an equal number of TFs for each branch is not essential but helps avoid biasing the inference to one particular lineage.
+
+<p> Next, we need to decide whether to compute DICE for each developmental timepoint, or for pseudotime bins. In this particular case, we use pseudotime bins, because the above diffusion map indicated substantial asynchrony between cells from different developmental timepoints, and because using bins ensures identical or near-identical cell numbers for each pseudotime bin.</p>
+
+```{r chunkL7, eval=T, echo=T}
+selTF.v <- c("LSR","ELF3","IRF6","BGN","NR1I3","NR1I2","FOXA2","TRIM15");
+### find pseudotime
+dpt.v <- dpt.o$DPT10; ## because root.idx is 10
+bin.o <- CreateDPTbin(dpt.v,minBins=7);
+dice.v <- vector();
+for(b in 1:length(bin.o$binList)){
+  dice.v[b] <- CompDICE(yangTFA.m[selTF.v,bin.o$binList[[b]]])$dice;
+}
+```
+Now, we plot DICE as a function of pseudotime bin:
+
+```{r chunkL8, fig.width=6,fig.height=3, fig.fullwidth=T, eval=T, echo=T}
+plot(dice.v,xlab="DPT-bin",ylab="DICE",pch=23,col="red",bg="red",type="b");
+```
+
+Thus, from the way DICE changes with DPT-bin, we can conclude that the bifurcation occurs between DPT-bin 5 and 6. In order to better assess this, we can determine sampling variability with a bootstrapping approach, which however we comment out here to avoid lengthy computation. Instead, we load in the precomputed bootstrapped values:
+
+```{r chunkL9, eval=T, echo=T}
+nBoots <- 1000;
+#diceBoot.m <- matrix(nrow=nBoots,ncol=length(bin.o$binList));
+#for(bsi in 1:nBoots){
+# for(bin in 1:length(bin.o$binList)){
+#  tp.idx <- sample(bin.o$binList[[bin]],length(bin.o$binList[[bin]]),replace=TRUE);
+#  diceBoot.m[bsi,bin] <- CompDICE(yangTFA.m[selTF.v,tp.idx])$dice;
+# }
+# print(paste("DOne Bootstrap-",bsi,sep=""));
+#}
+data(diceBoot);
+```
+
+Now, let us replot the dynamics of DICE with bootstrap confidence intervals and a symmetric sigmoid function fit:
+
+```{r chunkL10, fig.width=7.5,fig.height=3, fig.fullwidth=T, eval=T, echo=T}
+sd.v <- apply(diceBoot.m,2,sd);
+errbar(x=1:length(dice.v),y=colMeans(diceBoot.m), yplus=colMeans(diceBoot.m)+1.96*sd.v, yminus=colMeans(diceBoot.m)-1.96*sd.v, cap=0.015, main = NULL, add=FALSE, lty=1, type='p', ylim=NULL, lwd=1, pch=16, errbar.col="black",col="red",xlab="DPT-bin",ylab="DICE",cex=1,axes=FALSE);
+axis(2,las=2,cex.axis=1);
+mtext(side=1,line=0.1,at=1:length(dice.v),1:7,cex=1);
+
+symsigF <- function(x,p1,p2,p3,p4){ p1 + p2/(1+exp(p3*(p4-x)))}
+y <- colMeans(diceBoot.m)
+x <- 1:7
+fit <- nls(y ~ symsigF(x,p1,p2,p3,p4),data=data.frame(x,y),start=list(p1=-0.25,p2=-4,p3=2,p4=6));
+pest.v <- coef(fit);
+yfit <- symsigF(x,p1=pest.v[1],p2=pest.v[2],p3=pest.v[3],p4=pest.v[4]);
+points(x,yfit,col="orange",type="l");
+```
+Thus, although the fit suggest that the bifurcation begins in DPT-bin 5, the bootstrapping analysis suggests that the bifurcation occurs immediately after DPT-bin 5. By studying the distribution of cells from bins 5 and 6 in relation to developmental timepoint we can now better pinpoint the bifurcation as occuring immediately after E14/E14.5:
+
+```{r chunkL11, eval=T, echo=T}
+table(phenoData(yangLiver)$Time,bin.o$idx);
+```
+
+
+
+# Session Info
+```{r sessionInfo, eval=T, echo=T}
+sessionInfo()
+```
+
+# References

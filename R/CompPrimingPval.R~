@@ -1,0 +1,71 @@
+#' @title 
+#' Assesses whether there is evidence for any priming in a cell population
+#' 
+#' @aliases CompPrimingPval
+#'  
+#' @description 
+#' This function evaluates whether the calculated DICE value of a cell population
+#' is significantly lower than that of a randomized data matrix, indicating presence
+#' of significant associations. This is mean to be applied to a multipotent cell population
+#' to determine if there is significant priming.
+#' 
+#' @param data.m
+#' The input data matrix, representing the normalized gene expression data matrix
+#' over regulatory factors (rows) and single cells (columns).
+#' 
+#' @param dice.o
+#' The output object from CompDICE.
+#'
+#' @param nMC
+#' Number of Monte-Carlo runs.
+#'
+#' @param ncores
+#' Number of cores for parallelizing.
+#'
+#' 
+#' @return A list of two elements:
+#' 
+#' @return pval
+#' Empirical P-value of significance.
+#'
+#' @return null
+#' A vector with the null DICE values.
+#' 
+#' 
+#' @references 
+#' Qi Luo, Alok K Maity, Andrew E Teschendorff
+#' \emph{Distance Covariance Entropy reveals primed states and bifurcation dynamics in single-cell RNA-Seq data}
+#' Submitted.
+#' 
+#' 
+#' @examples 
+#'
+#' 
+#' @import corpcor
+#' @import parallel
+#' 
+#' @export
+#'
+CompPrimingPval <- function(data.m, dice.o, nMC=1000, ncores=4){
+
+  idx.l <- as.list(1:nMC);
+  mcl.o <- mclapply(idx.l,doPrimedPRL,data.m,mc.cores=ncores);
+  null.v <- unlist(mcl.o);
+  pval <- length(which(null.v < dice.o$dice))/nMC;
+  return(list(pval=pval,null=null.v));
+}
+
+#### Auxilliary functions
+#' 
+
+doPrimedPRL <- function(idx,data.m){
+    random.m <- t(apply(data.m,1,randomizeV))
+    null <- CompDICE(random.m);
+    return(null);
+}
+
+#'
+randomizeV <- function(v){
+   return(sample(v,length(v),replace=FALSE));
+}
+    
