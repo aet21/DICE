@@ -27,4 +27,4 @@ devtools::install_github("aet21/DICE")
 # References
 
 Distance covariance entropy reveals primed states and bifurcation dynamics in single-cell RNA-Seq
-data. Luo Qi, Alok K Maity, Andrew E Teschendorff. Submitted 2022.
+data. Luo Qi, Alok K Maity, Andrew E Teschendorff. iScience 2022 Dec 1;25(12):105709.
